@@ -1,2 +1,2 @@
 # udplogserver
-Collect messages from udp socket and transgers they to DB
+Collect messages from udp socket and transfers they to DB or stdout
