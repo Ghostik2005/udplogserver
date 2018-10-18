@@ -19,7 +19,8 @@ class UDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
     daemon_threads = True
     allow_reuse_address = True
     socket_type = socket.SOCK_DGRAM
-    max_packet_size = 8192
+    #max_packet_size = 8192
+    max_packet_size = 65536
 
     def __init__(self, server_address, RequestHandlerClass, log):
         super(UDPServer, self).__init__(server_address, RequestHandlerClass)
@@ -57,8 +58,6 @@ class UDPHandler:
         data = self.request[0].strip().decode()
         data = json.loads(data)
         sock = self.request[1]
-        #print(type(data), flush=True)
-        #print(data, flush=True)
         sys.APPCONF["queue"].put(data)
 
     def finish(self):
@@ -94,15 +93,19 @@ class SaveData:
     def __init__(self, base_type=None, connect_args=None):
         self.base_type = base_type
         if self.base_type == 'clickhouse':
+            print("saving to clickhouse", flush=True)
             self._send = self._ch
             self._ch_args = connect_args
         elif self.base_type == 'postgres':
+            print("saving to postgres", flush=True)
             self._send = self._pg
             self._pg_args = connect_args
         elif self.base_type == 'firebird':
+            print("saving to firebird", flush=True)
             self._send = self._fb
             self._fb_args = connect_args
         else:
+            print("saving to stdout", flush=True)
             self._send = _print
 
 
@@ -110,17 +113,21 @@ class SaveData:
         pass
 
     def _ch(self, full_data):
-        print("saving to clickhouse", flush=True)
+        #print("saving to clickhouse", flush=True)
         for item in full_data:
-            print(item, flush=True)
+            try:
+                print(item, flush=True)
+            except:
+                print("-"*20)
+                
 
     def _pg(self, full_data):
-        print("saving to postgres", flush=True)
+        #print("saving to postgres", flush=True)
         for item in full_data:
             print(item, flush=True)
 
     def _fb(self, full_data):
-        print("saving to firebird", flush=True)
+        #print("saving to firebird", flush=True)
         for item in full_data:
             print(item, flush=True)
 
