@@ -10,6 +10,7 @@ import traceback
 import socketserver
 import configparser
 from urllib.parse import unquote
+import ms71lib.client as ms71_cli
 
 class UDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
     """
@@ -69,7 +70,13 @@ def qRead(interval=60, size=100000):
     вычитываем длину очереди, и если там много элементов или подошло время, то даем задание на запись данных
     """
     start_time = time.time()
-    saveD = SaveData('clickhouse')
+    key = ''
+    with open('api.key', 'r') as f_obj:
+        key = f_obj.read().strip()
+    saveD = SaveData(base_type='text', 
+    #saveD = SaveData(base_type='clickhouse', 
+                     connect_args={"uri":"https://online365.pro/ch/", "verbose":False, "api_key":key}
+                     )
     while True:
         try:
             time_dif = time.time() - start_time
@@ -96,6 +103,8 @@ class SaveData:
             print("saving to clickhouse", flush=True)
             self._send = self._ch
             self._ch_args = connect_args
+            self._create_ch_tables()
+
         elif self.base_type == 'postgres':
             print("saving to postgres", flush=True)
             self._send = self._pg
@@ -106,19 +115,56 @@ class SaveData:
             self._fb_args = connect_args
         else:
             print("saving to stdout", flush=True)
-            self._send = _print
+            self._send = self._print
 
+    def _create_ch_tables(self):
+        sqls = [
+        """CREATE DATABASE IF NOT EXISTS udp_logs;""",
+        """CREATE TABLE IF NOT EXISTS udp_logs.logs
+(
+    application String,
+    type String,
+    user String,
+    payload String,
+    dt DateTime,
+    date Date
+) ENGINE = MergeTree(date, (dt, application, type), 8192);
+  """
+        ]
+        server = ms71_cli.ServerProxy(**self._ch_args)
+        
+        request = server("request")
+        for i in sqls:
+            r = request(i.encode())
+        server('close')
 
     def _make_connect(self):
         pass
 
     def _ch(self, full_data):
+        server = ms71_cli.ServerProxy(**self._ch_args)  
+        request = server("request")
+        sql = "INSERT INTO udp_logs.logs FORMAT Values %s;"
+        s = []
         #print("saving to clickhouse", flush=True)
-        for item in full_data:
+        for i in full_data:
             try:
-                print(item, flush=True)
+                s.append(f"""('{str(i[0])}', '{str(i[1])}', '{str(i[2])}', '{str(i[3]).replace("'", '"')}', '{str(i[4])}', '{str(i[4].split()[0])}') """)
+                #for i in item:
+                    
+                    #print(i, type(i), sep="\t\t")
+                #print(item, flush=True)
             except:
-                print("-"*20)
+                pass
+                print("-"*20, flush=True)
+                print(i, flush=True)
+                print("-"*20, flush=True)
+        if len(s) > 0:
+            sq = sql % ', '.join(s)
+            #sq = sq.replace("'", '"')
+            #print(sq)
+            request(sq.encode())
+        server("close")
                 
 
     def _pg(self, full_data):
@@ -176,3 +222,12 @@ def handle_commandline():
     return args, kwargs
 
 
+def _int(x):
+    try:
+        fx = float(x)
+        ix = int(fx)
+        return ix if ix == fx else fx
+    except:
+        return x
+
+    
