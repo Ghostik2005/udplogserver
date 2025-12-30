@@ -1,7 +1,8 @@
 #coding: utf-8
 
 __appname__ = 'udplogserver'
-__version__ = '2018.271.1350' #start the project
+__version__ = '2018.271.1350'  # start the project
+__version__ = '2025.364.0916'  # test
 
 import sys
 import time
